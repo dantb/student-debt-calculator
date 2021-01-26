@@ -21,3 +21,7 @@ sealed abstract case class Percentage(value: Double):
 object Percentage:
   def apply(value: Double): Option[Percentage] = 
     if (value >=0 && value <= 100) Some(new Percentage(value) {}) else None
+
+enum Outcome(total: Double, date: LocalDate):
+  case WrittenOff(total: Double, date: LocalDate) extends Outcome(total, date)
+  case PaidOff(total: Double, date: LocalDate) extends Outcome(total, date)
