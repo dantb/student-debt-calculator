@@ -12,15 +12,15 @@ final case class Parameters(
   retailPriceIndex: Percentage,
   minInterestRateThreshold: Double,
   maxInterestRateThreshold: Double
-)
+) {
+  def withSalary(salary: Double) = copy(startingSalary = salary)
+  def withExtraMonthlyRepayment(repayment: Double) = copy(extraMonthlyRepayment = repayment)
+}
 
 // maybe don't need this anymore in Scala 3?
-sealed abstract case class Percentage(value: Double):
+final case class Percentage(value: Double):
   def of(other: Double): Double = (value / 100) * other
-
-object Percentage:
-  def apply(value: Double): Option[Percentage] = 
-    if (value >=0 && value <= 100) Some(new Percentage(value) {}) else None
+  def +(other: Percentage): Percentage = Percentage(value + other.value)
 
 enum Outcome(total: Double, date: LocalDate):
   case WrittenOff(total: Double, date: LocalDate) extends Outcome(total, date)

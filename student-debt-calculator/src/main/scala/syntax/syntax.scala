@@ -3,4 +3,4 @@ package syntax
 import model.Percentage
 
 extension (c: Double)
-  def percent: Option[Percentage] = Percentage(c)
+  def percent: Percentage = Percentage(c)

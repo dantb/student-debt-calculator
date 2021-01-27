@@ -11,9 +11,9 @@ lazy val root = project
     Global / onChangedBuildSource := ReloadOnSourceChanges,
 
     libraryDependencies ++= deps,
-    testFrameworks += new TestFramework("munit.Framework")
+    testFrameworks += new TestFramework("weaver.framework.CatsEffect")
   )
 
 lazy val deps = Seq(
-  "org.scalameta" % "munit_3.0.0-M3" % "0.7.21" % Test
+  "com.disneystreaming" %% "weaver-cats" % "0.7.0-M6" % Test
 )
