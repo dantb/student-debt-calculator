@@ -3,3 +3,4 @@
 */target
 *target/
 *dotty-ide*
+*/config.env

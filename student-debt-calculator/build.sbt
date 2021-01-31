@@ -5,15 +5,16 @@ lazy val root = project
   .settings(
     name := "student-debt-calculator",
     version := "0.1.0",
-
     scalaVersion := scala3Version,
-
     Global / onChangedBuildSource := ReloadOnSourceChanges,
-
     libraryDependencies ++= deps,
-    testFrameworks += new TestFramework("weaver.framework.CatsEffect")
+    testFrameworks += new TestFramework("weaver.framework.CatsEffect"),
+    envFileName in ThisBuild := "config.env"
   )
 
 lazy val deps = Seq(
+  "com.google.auth" % "google-auth-library-oauth2-http" % "0.23.0",
+  "io.circe" %% "circe-core" % "0.14.0-M3",
+  "org.typelevel" %% "cats-effect" % "3.0-65-7c98c86",
   "com.disneystreaming" %% "weaver-cats" % "0.7.0-M6" % Test
 )
