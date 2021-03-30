@@ -1,0 +1,87 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.34.3.
+--
+-- see: https://github.com/sol/hpack
+
+name:           student-debt-projection
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/githubuser/student-debt-projection#readme>
+homepage:       https://github.com/githubuser/student-debt-projection#readme
+bug-reports:    https://github.com/githubuser/student-debt-projection/issues
+author:         Author name here
+maintainer:     example@example.com
+copyright:      2021 Author name here
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+
+source-repository head
+  type: git
+  location: https://github.com/githubuser/student-debt-projection
+
+library
+  exposed-modules:
+      Google
+      Lib
+  other-modules:
+      Paths_student_debt_projection
+  hs-source-dirs:
+      src
+  build-depends:
+      aeson
+    , base >=4.7 && <5
+    , http-client
+    , http-client-tls
+    , servant
+    , servant-client
+    , servant-server
+    , wai
+    , warp
+  default-language: Haskell2010
+
+executable student-debt-projection-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_student_debt_projection
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      aeson
+    , base
+    , http-client
+    , http-client-tls
+    , servant
+    , servant-client
+    , servant-server
+    , student-debt-projection
+    , wai
+    , warp
+  default-language: Haskell2010
+
+test-suite student-debt-projection-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_student_debt_projection
+  hs-source-dirs:
+      test
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      aeson
+    , base
+    , hspec
+    , hspec-wai
+    , hspec-wai-json
+    , http-client
+    , http-client-tls
+    , servant
+    , servant-client
+    , servant-server
+    , student-debt-projection
+    , wai
+    , warp
+  default-language: Haskell2010
