@@ -21,11 +21,19 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
 - base >= 4.7 && < 5
 - aeson
+- bytestring
+- containers
+- cryptonite
+- directory
+- either
 - http-client
 - http-client-tls
+- jwt
+- mtl
 - servant-server
 - servant-client
 - servant
+- text
 - wai
 - warp
 
