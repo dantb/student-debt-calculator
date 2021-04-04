@@ -27,8 +27,17 @@ import Text.Read
 import Web.JWT
 import System.Directory
 import qualified Data.ByteString as BS
+import Data.Time.Clock.POSIX
 
 import qualified Servant.Client.Streaming as S
+
+type MyMonad m = ExceptT GoogleError m
+
+type API = "v4" :> "spreadsheets" :> Capture "spreadsheetId" String :> "values" :> Capture "range" String :> Header "Authorization" String :> Get '[JSON] Values
+
+data InvalidClaim = InvalidIss | InvalidAud | InvalidExp | InvalidIat | InvalidNumericDate deriving Show
+
+data GoogleError = InvalidClaim InvalidClaim | InvalidPrivateKey | InvalidText deriving Show
 
 data Values = Cells
   { range          :: String
@@ -41,22 +50,37 @@ instance ToJSON Values where
 
 instance FromJSON Values
 
--- $(deriveJSON defaultOptions ''Values)
-
 data Cell = Cell { row :: Integer, col :: Integer }
 
-data GoogleEnvironment = GoogleEnvironment { spreadsheetId :: String, privateKey :: PrivateKey }
+data GoogleEnvironment = GoogleEnvironment 
+  { spreadsheetId :: String
+  , privateKey :: PrivateKey
+  , serviceAccountEmail :: StringOrURI
+  , audClaim :: StringOrURI
+  , expirySeconds :: Integer }
+  deriving Show
 
-claimsSet2 :: Either InvalidClaim JWTClaimsSet
-claimsSet2 = do
-  iss <- maybeToRight InvalidIss $ parseStringOrUri "student-debt-projection-sa@student-debt-projection.iam.gserviceaccount.com"
-  aud <- maybeToRight InvalidAud $ parseStringOrUri "https://oauth2.googleapis.com/token"
-  exp <- maybeToRight InvalidExp $ numericDate 1617484700
-  iat <- maybeToRight InvalidIat $ numericDate 1617483700
-  return (claimsSet3 iss aud exp iat (ClaimsMap $ M.singleton (T.pack "scope") (A.String (T.pack "https://www.googleapis.com/auth/spreadsheets"))))
+epochSeconds :: IO POSIXTime
+epochSeconds = getPOSIXTime
 
-claimsSet3 :: StringOrURI -> StringOrURI -> NumericDate -> NumericDate -> ClaimsMap -> JWTClaimsSet
-claimsSet3 iss aud exp iat claims = JWTClaimsSet 
+parsePosixTime :: POSIXTime -> Either InvalidClaim NumericDate
+parsePosixTime d = maybeToRight InvalidNumericDate $ numericDate d
+
+generateClaims :: MonadIO m => GoogleEnvironment -> MyMonad m JWTClaimsSet
+generateClaims (GoogleEnvironment _ _ email audClaim expirySeconds) = do
+  now <- liftIO epochSeconds
+  nowNumericDate <- liftEither $ first InvalidClaim (parsePosixTime now)
+  tokenExpiry <- liftEither $ maybeToRight (InvalidClaim InvalidExp) $ addSeconds expirySeconds nowNumericDate
+  return $ constructClaims email audClaim tokenExpiry nowNumericDate otherClaims
+
+addSeconds :: Integer -> NumericDate -> Maybe NumericDate
+addSeconds i n = numericDate $ secondsSinceEpoch n + fromInteger i
+
+otherClaims :: ClaimsMap
+otherClaims = ClaimsMap $ M.singleton (T.pack "scope") (A.String (T.pack "https://www.googleapis.com/auth/spreadsheets"))
+
+constructClaims :: StringOrURI -> StringOrURI -> NumericDate -> NumericDate -> ClaimsMap -> JWTClaimsSet
+constructClaims iss aud exp iat claims = JWTClaimsSet 
   { iss =  Just iss
   , sub = Nothing
   , aud = Just $ Left aud
@@ -71,18 +95,13 @@ parseStringOrUri :: String -> Maybe StringOrURI
 parseStringOrUri = stringOrURI . T.pack
 
 generateJwt :: GoogleEnvironment -> JWTClaimsSet -> T.Text
-generateJwt env claims = encodeSigned (RSAPrivateKey (privateKey env)) mempty claims
+generateJwt env = encodeSigned (RSAPrivateKey (privateKey env)) mempty
 
 readKey :: IO (Maybe PrivateKey)
-readKey = fmap (parseKey) (readFile "./scripts/private.pem")
+readKey = readRsaSecret <$> BS.readFile "./scripts/private.pem"
 
 parseKey :: String -> Maybe PrivateKey
-parseKey t = (readMaybe t) >>= readRsaSecret
-
-anotherOne :: IO (Maybe PrivateKey)
-anotherOne = readRsaSecret <$> BS.readFile "./scripts/private.pem"
-
-type API = "v4" :> "spreadsheets" :> Capture "spreadsheetId" String :> "values" :> Capture "range" String :> Header "Authorization" String :> Get '[JSON] Values
+parseKey t = readMaybe t >>= readRsaSecret
 
 sheetValues :: String -> String -> Maybe String -> ClientM Values
 sheetValues = client api
@@ -108,17 +127,6 @@ run = do
   case result of
     Right () -> print "Program completed successfully"
     Left e -> print $ "Error in program: " ++ show e
-  -- res <- runClientM queries (mkClientEnv manager' serverLocation)
-  -- case res of
-  --   Left err -> putStrLn $ "Error: " ++ show err
-  --   Right values -> do
-  --     print values
-
-data InvalidClaim = InvalidIss | InvalidAud | InvalidExp | InvalidIat deriving Show
-
-data GoogleError = InvalidClaim InvalidClaim | InvalidPrivateKey | InvalidText deriving Show
-
-type MyMonad m = ExceptT GoogleError m
 
 runM :: MonadIO m => MyMonad m ()
 runM = do
@@ -127,8 +135,12 @@ runM = do
   -- text <- liftEither $ maybeToRight InvalidText $ readMaybe theKey
   -- liftIO $ print ("Read the text " ++ text)
   liftIO $ print ("Current directory is " ++ dir)
-  key <- ExceptT $ liftIO $ fmap (maybeToRight InvalidPrivateKey) anotherOne
+  key <- ExceptT $ liftIO $ fmap (maybeToRight InvalidPrivateKey) readKey
   liftIO $ print "Read the key"
-  claims <- liftEither $ first InvalidClaim claimsSet2
+  email <- liftEither $ maybeToRight (InvalidClaim InvalidIss) $ parseStringOrUri "student-debt-projection-sa@student-debt-projection.iam.gserviceaccount.com"
+  audClaim <- liftEither $ maybeToRight (InvalidClaim InvalidAud) $ parseStringOrUri "https://oauth2.googleapis.com/token"
+  let googleEnv = GoogleEnvironment "1nCeGC0XHnIVwQ3EyGRMZRmExkiP_wpVgotIZQS98e28" key email audClaim 1000
+  claims <- generateClaims googleEnv
+  liftIO $ print ("Google env is" ++ show googleEnv)
   liftIO $ print ("Read the claims" ++ show claims)
-  liftIO $ print $ show $ generateJwt (GoogleEnvironment "1nCeGC0XHnIVwQ3EyGRMZRmExkiP_wpVgotIZQS98e28" key) claims
+  liftIO $ print $ show $ generateJwt googleEnv claims

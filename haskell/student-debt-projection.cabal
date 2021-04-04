@@ -46,6 +46,7 @@ library
     , servant-client
     , servant-server
     , text
+    , time
     , wai
     , warp
   default-language: Haskell2010
@@ -74,6 +75,7 @@ executable student-debt-projection-exe
     , servant-server
     , student-debt-projection
     , text
+    , time
     , wai
     , warp
   default-language: Haskell2010
@@ -107,6 +109,7 @@ test-suite student-debt-projection-test
     , servant-server
     , student-debt-projection
     , text
+    , time
     , wai
     , warp
   default-language: Haskell2010
