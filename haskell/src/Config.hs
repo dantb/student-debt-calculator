@@ -1,10 +1,7 @@
 {-# LANGUAGE DataKinds       #-}
 {-# LANGUAGE DeriveGeneric   #-}
-module Config (main)
- where
+module Config (decodeConfig, Config, Config(..)) where
 
-import Prelude hiding (exp)
-import Control.Monad.Except
 import Crypto.PubKey.RSA
 import Data.Aeson
 import qualified Data.Aeson as A
@@ -15,9 +12,6 @@ import Data.Maybe
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import GHC.Generics
-import Network.HTTP.Client (newManager)
-import Network.HTTP.Client.TLS (tlsManagerSettings)
-import Servant.API
 import System.Envy
 import Servant.Client
 import Servant.Types.SourceT (foreach)
@@ -28,18 +22,12 @@ import qualified Data.ByteString as BS
 import Data.Time.Clock.POSIX
 import Data.String
 
+import Errors
+
 import qualified Servant.Client.Streaming as S
 
-
-main :: IO ()
-main = do 
-  env <- decodeConfig
-  case env of
-    Left error -> print error
-    Right config -> print $ show config
-
-decodeConfig :: IO (Either String Config)
-decodeConfig = decodeEnv
+decodeConfig :: IO (Either ConfigError Config)
+decodeConfig = fmap (first ConfigError) decodeEnv
 
 data Config = Config 
   { spreadsheetId :: String

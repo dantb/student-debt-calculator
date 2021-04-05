@@ -1,10 +1,9 @@
 {-# LANGUAGE DataKinds       #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeOperators   #-}
 {-# LANGUAGE DeriveGeneric   #-}
-module Google
-    ( run
-    ) where
+module Google where
 
 import Prelude hiding (exp)
 import Control.Monad.Except
@@ -31,13 +30,12 @@ import Data.Time.Clock.POSIX
 
 import qualified Servant.Client.Streaming as S
 
+import Config
+import Errors
+
 type MyMonad m = ExceptT GoogleError m
 
 type API = "v4" :> "spreadsheets" :> Capture "spreadsheetId" String :> "values" :> Capture "range" String :> Header "Authorization" String :> Get '[JSON] Values
-
-data InvalidClaim = InvalidIss | InvalidAud | InvalidExp | InvalidIat | InvalidNumericDate deriving Show
-
-data GoogleError = InvalidClaim InvalidClaim | InvalidPrivateKey | InvalidText deriving Show
 
 data Values = Cells
   { range          :: String
@@ -52,25 +50,17 @@ instance FromJSON Values
 
 data Cell = Cell { row :: Integer, col :: Integer }
 
-data GoogleEnvironment = GoogleEnvironment 
-  { spreadsheetId :: String
-  , privateKey :: PrivateKey
-  , serviceAccountEmail :: StringOrURI
-  , audClaim :: StringOrURI
-  , expirySeconds :: Integer } deriving Show
-
-epochSeconds :: IO POSIXTime
-epochSeconds = getPOSIXTime
-
-parsePosixTime :: POSIXTime -> Either InvalidClaim NumericDate
+parsePosixTime :: POSIXTime -> Either GoogleError NumericDate
 parsePosixTime d = maybeToRight InvalidNumericDate $ numericDate d
 
-generateClaims :: MonadIO m => GoogleEnvironment -> MyMonad m JWTClaimsSet
-generateClaims (GoogleEnvironment _ _ email audClaim expirySeconds) = do
-  now <- liftIO epochSeconds
-  nowNumericDate <- liftEither $ first InvalidClaim (parsePosixTime now)
-  tokenExpiry <- liftEither $ maybeToRight (InvalidClaim InvalidExp) $ addSeconds expirySeconds nowNumericDate
-  return $ constructClaims email audClaim tokenExpiry nowNumericDate otherClaims
+epochSeconds :: (MonadError GoogleError m, MonadIO m, Monad m) => m NumericDate
+epochSeconds = liftIO getPOSIXTime >>= (liftEither . parsePosixTime)
+
+generateClaims :: (MonadIO m, MonadError GoogleError m) => Config -> m JWTClaimsSet
+generateClaims (Config _ _ email audClaim expirySeconds) = do
+  now <- epochSeconds
+  tokenExpiry <- liftEither $ maybeToRight InvalidExp $ addSeconds expirySeconds now
+  return $ constructClaims email audClaim tokenExpiry now otherClaims
 
 addSeconds :: Integer -> NumericDate -> Maybe NumericDate
 addSeconds i n = numericDate $ secondsSinceEpoch n + fromInteger i
@@ -90,17 +80,29 @@ constructClaims iss aud exp iat claims = JWTClaimsSet
   , unregisteredClaims = claims
   }
 
+data GogEnv = GogEnv 
+  { config :: Config
+  , lastRefreshedJwt :: Integer
+  , jwt :: T.Text }
+
+refreshJwt :: (MonadIO m, MonadError GoogleError m) => GogEnv -> m GogEnv
+refreshJwt env@(GogEnv config@(Config _ _ _ _ expirySeconds) lastRefreshedJwt jwt) = do
+  now <- epochSeconds
+  let nowNominal = secondsSinceEpoch now in
+    if nowNominal >= (fromInteger (lastRefreshedJwt + expirySeconds))
+      then do 
+        claims <- generateClaims config
+        return (GogEnv config (round nowNominal) (generateJwt config claims))
+      else return env
+
+-- getCells :: Config -> IO Values
+-- getCells
+
 parseStringOrUri :: String -> Maybe StringOrURI
 parseStringOrUri = stringOrURI . T.pack
 
-generateJwt :: GoogleEnvironment -> JWTClaimsSet -> T.Text
-generateJwt env = encodeSigned (RSAPrivateKey (privateKey env)) mempty
-
-readKey :: IO (Maybe PrivateKey)
-readKey = readRsaSecret <$> BS.readFile "./scripts/private.pem"
-
-parseKey :: String -> Maybe PrivateKey
-parseKey t = readMaybe t >>= readRsaSecret
+generateJwt :: Config -> JWTClaimsSet -> T.Text
+generateJwt env = encodeSigned (RSAPrivateKey (rsaPrivateKey env)) mempty
 
 sheetValues :: String -> String -> Maybe String -> ClientM Values
 sheetValues = client api
@@ -120,26 +122,27 @@ serverLocation = BaseUrl
   , baseUrlPath   = ""
   }
 
-run :: IO ()
-run = do
-  result <- runExceptT runM
-  case result of
-    Right () -> print "Program completed successfully"
-    Left e -> print $ "Error in program: " ++ show e
+-- run :: IO ()
+-- run = do
+--   result <- runExceptT runM
+--   case result of
+--     Right () -> print "Program completed successfully"
+--     Left e -> print $ "Error in program: " ++ show e
 
-runM :: MonadIO m => MyMonad m ()
-runM = do
-  manager' <- liftIO $ newManager tlsManagerSettings
-  dir <- liftIO getCurrentDirectory
-  -- text <- liftEither $ maybeToRight InvalidText $ readMaybe theKey
-  -- liftIO $ print ("Read the text " ++ text)
-  liftIO $ print ("Current directory is " ++ dir)
-  key <- ExceptT $ liftIO $ fmap (maybeToRight InvalidPrivateKey) readKey
-  liftIO $ print "Read the key"
-  email <- liftEither $ maybeToRight (InvalidClaim InvalidIss) $ parseStringOrUri "student-debt-projection-sa@student-debt-projection.iam.gserviceaccount.com"
-  audClaim <- liftEither $ maybeToRight (InvalidClaim InvalidAud) $ parseStringOrUri "https://oauth2.googleapis.com/token"
-  let googleEnv = GoogleEnvironment "1nCeGC0XHnIVwQ3EyGRMZRmExkiP_wpVgotIZQS98e28" key email audClaim 1000
-  claims <- generateClaims googleEnv
-  liftIO $ print ("Google env is" ++ show googleEnv)
-  liftIO $ print ("Read the claims" ++ show claims)
-  liftIO $ print $ show $ generateJwt googleEnv claims
+-- getCells :: (MonadIO m, MonadError ) -> 
+
+-- buildGoogleEnvironment :: (MonadError GoogleError m, MonadIO m) => Config -> Manager -> m GogEnv
+-- buildGoogleEnvironment config manager =
+
+-- runM :: (MonadError AppError m, MonadIO m) => m ()
+-- runM = do
+--   manager' <- liftIO $ newManager tlsManagerSettings
+--   dir <- liftIO getCurrentDirectory
+--   -- text <- liftEither $ maybeToRight InvalidText $ readMaybe theKey
+--   -- liftIO $ print ("Read the text " ++ text)
+--   config <- liftIO $ decodeConfig >>= (\e -> liftEither $ first ConfigErr e)
+--   liftIO $ print ("Config is " <> (show config))
+--   claims <- generateClaims config
+--   liftIO $ print ("Google env is" ++ show config)
+--   liftIO $ print ("Read the claims" ++ show claims)
+--   liftIO $ print $ show $ generateJwt config claims
