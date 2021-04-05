@@ -57,8 +57,7 @@ data GoogleEnvironment = GoogleEnvironment
   , privateKey :: PrivateKey
   , serviceAccountEmail :: StringOrURI
   , audClaim :: StringOrURI
-  , expirySeconds :: Integer }
-  deriving Show
+  , expirySeconds :: Integer } deriving Show
 
 epochSeconds :: IO POSIXTime
 epochSeconds = getPOSIXTime

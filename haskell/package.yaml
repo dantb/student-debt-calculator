@@ -26,6 +26,7 @@ dependencies:
 - cryptonite
 - directory
 - either
+- envy
 - http-client
 - http-client-tls
 - jwt
