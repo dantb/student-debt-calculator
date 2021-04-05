@@ -26,6 +26,7 @@ library
   exposed-modules:
       Google
       Lib
+      RangeSpec
   other-modules:
       Paths_student_debt_projection
   hs-source-dirs:

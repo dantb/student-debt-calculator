@@ -28,6 +28,7 @@ library
       Errors
       Google
       Lib
+      Range
   other-modules:
       Paths_student_debt_projection
   hs-source-dirs:
@@ -88,13 +89,13 @@ test-suite student-debt-projection-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      Setup
       Paths_student_debt_projection
   hs-source-dirs:
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      aeson
+      QuickCheck
+    , aeson
     , base
     , bytestring
     , containers

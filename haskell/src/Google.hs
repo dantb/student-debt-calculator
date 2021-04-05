@@ -48,8 +48,6 @@ instance ToJSON Values where
 
 instance FromJSON Values
 
-data Cell = Cell { row :: Integer, col :: Integer }
-
 parsePosixTime :: POSIXTime -> Either GoogleError NumericDate
 parsePosixTime d = maybeToRight InvalidNumericDate $ numericDate d
 

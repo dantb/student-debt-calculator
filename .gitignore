@@ -4,4 +4,4 @@
 *target/
 *dotty-ide*
 */config.env
-*/.stack-work
+**/.stack-work

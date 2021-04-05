@@ -4,4 +4,4 @@ import Google
 import qualified Config as C
 
 main :: IO ()
-main = C.main
+main = putStrLn "Hello"
