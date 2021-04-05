@@ -5,7 +5,7 @@
 {-# LANGUAGE DeriveGeneric   #-}
 module Google where
 
-import Prelude hiding (exp)
+import Prelude hiding (exp, log)
 import Control.Monad.Except
 import Crypto.PubKey.RSA
 import Data.Aeson
@@ -85,15 +85,22 @@ data GogEnv = GogEnv
   , lastRefreshedJwt :: Integer
   , jwt :: T.Text }
 
+log :: MonadIO m => String -> m ()
+log = liftIO . putStrLn
+
 refreshJwt :: (MonadIO m, MonadError GoogleError m) => GogEnv -> m GogEnv
 refreshJwt env@(GogEnv config@(Config _ _ _ _ expirySeconds) lastRefreshedJwt jwt) = do
   now <- epochSeconds
-  let nowNominal = secondsSinceEpoch now in
-    if nowNominal >= (fromInteger (lastRefreshedJwt + expirySeconds))
+  let nowNominal = secondsSinceEpoch now 
+      expiredAt = lastRefreshedJwt + expirySeconds in
+    if nowNominal >= fromInteger expiredAt
       then do 
+        log $ "JWT expired since " <> (show expiredAt) <> " , regenerating."
         claims <- generateClaims config
         return (GogEnv config (round nowNominal) (generateJwt config claims))
-      else return env
+      else do
+        log $ "Reusing previous JWT, valid until " <> (show expiredAt)
+        return env
 
 -- getCells :: Config -> IO Values
 -- getCells
