@@ -1,10 +1,17 @@
 module Range 
   (parseRow
   , parseCol
+  , parseCol'
   , parseCell
+  , parseCell'
   , parseRange
   , singleCellRange
+  , incrementCol
+  , incrementRow
   , Cell) where
+
+import Data.Char
+import Data.Either.Combinators
 
 import Errors
 
@@ -24,10 +31,22 @@ instance Ord Col where
 validCols :: String
 validCols = ['A'..'Z']
 
+incrementCol :: Int -> Col -> Col
+incrementCol _ (Col "Z") = Col 'Z'
+incrementCol i c = Col $ chr (ord c + i)
+
+incrementRow :: Int -> Row -> Row
+incrementRow i (Row row) = Row (row + i)
+
 parseCol :: String -> Maybe Col
 parseCol [] = Nothing
 parseCol [x] = if x `elem` validCols then Just $ Col [x] else Nothing
 parseCol (x:xs) = parseCol [x] *> parseCol xs *> Just (Col (x:xs))
+
+parseCol' :: String -> Either String Col
+parseCol' [] = Left "Empty string is not a valid column"
+parseCol' [x] = if x `elem` validCols then Right $ Col [x] else Left $ "Invalid character for column: " ++ show x
+parseCol' (x:xs) = parseCol' [x] *> parseCol' xs *> Right (Col (x:xs))
 
 parseRow :: Int -> Maybe Row
 parseRow i
@@ -40,6 +59,12 @@ parseCell :: Int -> String -> Maybe Cell
 parseCell r c = do
   row <- parseRow r
   col <- parseCol c
+  return $ Cell row col
+
+parseCell' :: Int -> String -> Either String Cell
+parseCell' r c = do
+  row <- maybeToRight ("Invalid Row: " ++ show r) (parseRow r)
+  col <- maybeToRight ("Invalid Col: " ++ show c) (parseCol c)
   return $ Cell row col
 
 data Range = Range { sheet :: String, start :: Cell, end :: Cell } deriving Show
