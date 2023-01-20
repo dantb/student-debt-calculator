@@ -1,0 +1,14 @@
+*.bsp
+*.idea
+*/target
+*target/
+*dotty-ide*
+*/config.env
+**/.stack-work
+
+.bsp/
+.vscode/
+.bloop/
+*metals.sbt
+*.iml
+/.metals
